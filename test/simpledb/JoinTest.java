@@ -17,6 +17,8 @@ import simpledb.storage.Tuple;
 import simpledb.storage.TupleDesc;
 import simpledb.systemtest.SimpleDbTestBase;
 
+import java.util.ArrayList;
+
 public class JoinTest extends SimpleDbTestBase {
 
   final int width1 = 2;
@@ -83,7 +85,6 @@ public class JoinTest extends SimpleDbTestBase {
     }
     assertTrue(TestUtil.checkExhausted(op));
     op.rewind();
-
     eqJoin.open();
     Tuple expected = eqJoin.next();
     Tuple actual = op.next();

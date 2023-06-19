@@ -1,15 +1,16 @@
 package simpledb.optimizer;
 
 import simpledb.common.Database;
+import simpledb.common.DbException;
 import simpledb.common.Type;
 import simpledb.execution.Predicate;
 import simpledb.execution.SeqScan;
 import simpledb.storage.*;
 import simpledb.transaction.Transaction;
+import simpledb.transaction.TransactionAbortedException;
+import simpledb.transaction.TransactionId;
 
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -68,6 +69,23 @@ public class TableStats {
      */
     static final int NUM_HIST_BINS = 100;
 
+    private Map<Integer, StringHistogram> stringHistogramMap;
+
+    private Map<Integer, IntHistogram> integerIntHistogramMap;
+
+    HeapFile dbFile;
+
+    private int ioCostPerPage;
+
+    private int tableId;
+
+    private int totalTuple;
+
+    private int totalPages;
+
+    private TupleDesc tupleDesc;
+
+    private List<Tuple> tupleList;
     /**
      * Create a new TableStats object, that keeps track of statistics on each
      * column of a table
@@ -87,6 +105,70 @@ public class TableStats {
         // necessarily have to (for example) do everything
         // in a single scan of the table.
         // some code goes here
+        this.dbFile = (HeapFile) Database.getCatalog().getDatabaseFile(tableid);
+        this.ioCostPerPage = ioCostPerPage;
+        this.totalPages = this.dbFile.numPages();
+        this.tableId = tableid;
+        this.tupleDesc = this.dbFile.getTupleDesc();
+        this.tupleList = new ArrayList<>();
+        this.integerIntHistogramMap = new HashMap<>();
+        this.stringHistogramMap = new HashMap<>();
+        // key for filed index, value for all values in this field
+        HashMap<Integer, Integer> minimum = new HashMap<>();
+        HashMap<Integer, Integer> maximum = new HashMap<>();
+        DbFileIterator tupleIt = dbFile.iterator(new TransactionId());
+        int numFields = tupleDesc.numFields();
+        for (int i = 0; i < numFields; i++) {
+            minimum.put(i, Integer.MAX_VALUE);
+            maximum.put(i, Integer.MIN_VALUE);
+        }
+        try {
+            tupleIt.open();
+        while (tupleIt.hasNext()) {
+            this.totalTuple++;
+            Tuple tuple = tupleIt.next();
+            tupleList.add(tuple);
+            for (int i = 0; i < numFields; i++) {
+                    Field field = tuple.getField(i);
+                    if (!(field instanceof IntField)) {
+                        continue;
+                    }
+                    IntField intField = (IntField) field;
+                    int value = intField.getValue();
+                    Integer curMin = minimum.get(i);
+                    Integer curMax = maximum.get(i);
+                    if (value < curMin) {
+                        minimum.put(i, value);
+                    }
+                    if (value > curMax) {
+                        maximum.put(i, value);
+                    }
+            }
+        }} catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        for (int i = 0; i < numFields; i++) {
+            Type fieldType = this.tupleDesc.getFieldType(i);
+            Iterator<Tuple> iterator = tupleList.iterator();
+            if (fieldType.equals(Type.INT_TYPE)) {
+                IntHistogram intHistogram = new IntHistogram(NUM_HIST_BINS, minimum.get(i), maximum.get(i));
+                integerIntHistogramMap.put(i, intHistogram);
+                while (iterator.hasNext()) {
+                    Tuple tuple = iterator.next();
+                    IntField field = (IntField) tuple.getField(i);
+                    intHistogram.addValue(field.getValue());
+                }
+            } else if (fieldType.equals(Type.STRING_TYPE)) {
+                StringHistogram stringHistogram = new StringHistogram(NUM_HIST_BINS);
+                stringHistogramMap.put(i, stringHistogram);
+                while (iterator.hasNext()) {
+                    Tuple tuple = iterator.next();
+                    StringField field = (StringField) tuple.getField(i);
+                    stringHistogram.addValue(field.getValue());
+                }
+            }
+        }
     }
 
     /**
@@ -102,8 +184,7 @@ public class TableStats {
      * @return The estimated cost of scanning the table.
      */
     public double estimateScanCost() {
-        // some code goes here
-        return 0;
+        return this.ioCostPerPage * this.totalPages;
     }
 
     /**
@@ -116,8 +197,8 @@ public class TableStats {
      *         selectivityFactor
      */
     public int estimateTableCardinality(double selectivityFactor) {
-        // some code goes here
-        return 0;
+        int i = (int) (selectivityFactor * totalTuple);
+        return i;
     }
 
     /**
@@ -149,7 +230,15 @@ public class TableStats {
      *         predicate
      */
     public double estimateSelectivity(int field, Predicate.Op op, Field constant) {
-        // some code goes here
+        if (constant instanceof IntField) {
+            IntField intField = (IntField) constant;
+            IntHistogram intHistogram = this.integerIntHistogramMap.get(field);
+            return intHistogram.estimateSelectivity(op, intField.getValue());
+        } else if (constant instanceof StringField) {
+            StringField stringField = (StringField) constant;
+            StringHistogram stringHistogram = this.stringHistogramMap.get(stringField);
+            return stringHistogram.estimateSelectivity(op, stringField.getValue());
+        }
         return 1.0;
     }
 

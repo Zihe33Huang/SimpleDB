@@ -1,5 +1,8 @@
 package simpledb.execution;
 
+import simpledb.common.Type;
+import simpledb.storage.Field;
+import simpledb.storage.RecordId;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.common.DbException;
 import simpledb.storage.Tuple;
@@ -14,6 +17,14 @@ public class Join extends Operator {
 
     private static final long serialVersionUID = 1L;
 
+    JoinPredicate p;
+
+    OpIterator child1;
+
+    OpIterator child2;
+
+    TupleDesc tupleDesc;
+
     /**
      * Constructor. Accepts two children to join and the predicate to join them
      * on
@@ -26,12 +37,16 @@ public class Join extends Operator {
      *            Iterator for the right(inner) relation to join
      */
     public Join(JoinPredicate p, OpIterator child1, OpIterator child2) {
-        // some code goes here
+        this.p = p;
+        this.child1 = child1;
+        this.child2 = child2;
+        this.tupleDesc = TupleDesc.merge(child1.getTupleDesc(), child2.getTupleDesc());
+
     }
 
     public JoinPredicate getJoinPredicate() {
-        // some code goes here
-        return null;
+
+        return p;
     }
 
     /**
@@ -59,13 +74,14 @@ public class Join extends Operator {
      *      implementation logic.
      */
     public TupleDesc getTupleDesc() {
-        // some code goes here
-        return null;
+        return this.tupleDesc;
     }
 
     public void open() throws DbException, NoSuchElementException,
             TransactionAbortedException {
-        // some code goes here
+        this.child1.open();
+        this.child2.open();
+        super.open();
     }
 
     public void close() {
@@ -73,7 +89,8 @@ public class Join extends Operator {
     }
 
     public void rewind() throws DbException, TransactionAbortedException {
-        // some code goes here
+       this.child1.rewind();
+       this.child2.rewind();
     }
 
     /**
@@ -94,9 +111,37 @@ public class Join extends Operator {
      * @return The next matching tuple.
      * @see JoinPredicate#filter
      */
+
+    Tuple tp1;
+
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
-        // some code goes here
-        return null;
+        while (true) {
+            if (tp1 == null) {
+                tp1 = child1.next();
+            }
+            while (child2.hasNext()) {
+                Tuple tp2 = child2.next();
+                boolean filter = this.p.filter(tp1, tp2);
+                if (filter) {
+                    Tuple newTuple = new Tuple(this.tupleDesc);
+                    Iterator<Field> fit1 = tp1.fields();
+                    Iterator<Field> fit2 = tp2.fields();
+                    while (fit1.hasNext()) {
+                        newTuple.addField(fit1.next());
+                    }
+                    while (fit2.hasNext()) {
+                        newTuple.addField(fit2.next());
+                    }
+                    return newTuple;
+                }
+            }
+            child2.rewind();
+            if (child1.hasNext()) {
+                tp1 = child1.next();
+            } else {
+                return null;
+            }
+        }
     }
 
     @Override

@@ -23,12 +23,24 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class Catalog {
 
+    Map<Integer, TableInfo> tableInfoMap;
+
+    Map<String, Integer> nameToIdMap;
+
+    class TableInfo {
+        DbFile dbFile;
+        String tableName;
+        int tableId;
+        String pkeyField;
+    }
+
     /**
      * Constructor.
      * Creates a new, empty catalog.
      */
     public Catalog() {
-        // some code goes here
+        this.tableInfoMap = new HashMap<>();
+        this.nameToIdMap = new HashMap<>();
     }
 
     /**
@@ -41,7 +53,13 @@ public class Catalog {
      * @param pkeyField the name of the primary key field
      */
     public void addTable(DbFile file, String name, String pkeyField) {
-        // some code goes here
+        TableInfo tableInfo = new TableInfo();
+        tableInfo.dbFile = file;
+        tableInfo.tableId = file.getId();
+        tableInfo.tableName = name;
+        tableInfo.pkeyField = pkeyField;
+        tableInfoMap.put(tableInfo.tableId, tableInfo);
+        nameToIdMap.put(tableInfo.tableName, tableInfo.tableId);
     }
 
     public void addTable(DbFile file, String name) {
@@ -64,8 +82,11 @@ public class Catalog {
      * @throws NoSuchElementException if the table doesn't exist
      */
     public int getTableId(String name) throws NoSuchElementException {
-        // some code goes here
-        return 0;
+        Integer integer = nameToIdMap.get(name);
+        if (integer == null) {
+            throw new NoSuchElementException();
+        }
+        return integer;
     }
 
     /**
@@ -75,8 +96,7 @@ public class Catalog {
      * @throws NoSuchElementException if the table doesn't exist
      */
     public TupleDesc getTupleDesc(int tableid) throws NoSuchElementException {
-        // some code goes here
-        return null;
+        return tableInfoMap.get(tableid).dbFile.getTupleDesc();
     }
 
     /**
@@ -86,8 +106,11 @@ public class Catalog {
      *     function passed to addTable
      */
     public DbFile getDatabaseFile(int tableid) throws NoSuchElementException {
-        // some code goes here
-        return null;
+        TableInfo tableInfo = tableInfoMap.get(tableid);
+        if (tableInfo == null) {
+            throw new NoSuchElementException();
+        }
+        return tableInfo.dbFile;
     }
 
     public String getPrimaryKey(int tableid) {
@@ -96,13 +119,11 @@ public class Catalog {
     }
 
     public Iterator<Integer> tableIdIterator() {
-        // some code goes here
-        return null;
+        return tableInfoMap.keySet().iterator();
     }
 
     public String getTableName(int id) {
-        // some code goes here
-        return null;
+        return tableInfoMap.get(id).tableName;
     }
     
     /** Delete all tables from the catalog */

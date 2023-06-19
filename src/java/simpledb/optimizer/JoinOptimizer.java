@@ -130,7 +130,9 @@ public class JoinOptimizer {
             // HINT: You may need to use the variable "j" if you implemented
             // a join algorithm that's more complicated than a basic
             // nested-loops join.
-            return -1.0;
+            double ioCost = card1 * cost2 + cost1;
+            double cpuCost = card1 * card2;
+            return ioCost + cpuCost;
         }
     }
 
@@ -208,7 +210,6 @@ public class JoinOptimizer {
         }
 
         return els;
-
     }
 
     /**
@@ -335,6 +336,7 @@ public class JoinOptimizer {
                 t1cost = prevBestCost; // left side just has cost of whatever
                                        // left
                 // subtree is
+                // zihe: 如果t1表已经在之前join过了，那么这时就join t2表
                 t1card = bestCard;
                 leftPkey = hasPkey(prevBest);
 
@@ -351,6 +353,7 @@ public class JoinOptimizer {
                 t2cost = prevBestCost; // left side just has cost of whatever
                                        // left
                 // subtree is
+                // zihe: 如果t2在之前join过了，那么就join t1表
                 t2card = bestCard;
                 rightPkey = hasPkey(prevBest);
                 t1cost = stats.get(table1Name).estimateScanCost();

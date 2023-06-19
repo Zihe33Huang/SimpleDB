@@ -187,8 +187,26 @@ public class BTreeFile implements DbFile {
 	private BTreeLeafPage findLeafPage(TransactionId tid, Map<PageId, Page> dirtypages, BTreePageId pid, Permissions perm,
                                        Field f)
 					throws DbException, TransactionAbortedException {
-		// some code goes here
-        return null;
+		int pgcateg = pid.pgcateg();
+		if (pgcateg == BTreePageId.LEAF) {
+			return (BTreeLeafPage) getPage(tid, dirtypages, pid, perm);
+		}
+		BTreeInternalPage page = (BTreeInternalPage) getPage(tid, dirtypages, pid, Permissions.READ_ONLY);
+		Iterator<BTreeEntry> it = page.iterator();
+		BTreeEntry next = null;
+		while (it.hasNext()) {
+			next = it.next();
+			// 如果f为null, 则找到最左leaf node, 不需要判断entry是不是第一个，因为只要f为null, 第一个肯定就进去执行了
+			if (f == null) {
+				return findLeafPage(tid, dirtypages, next.getLeftChild(), perm, f);
+			}
+			Field key = next.getKey();
+			if (key.compare(Op.GREATER_THAN_OR_EQ, key)) {
+				return findLeafPage(tid, dirtypages, next.getLeftChild(), perm, f);
+			}
+		}
+
+		return findLeafPage(tid, dirtypages, next.getRightChild(), perm, f);
 	}
 	
 	/**
@@ -239,7 +257,40 @@ public class BTreeFile implements DbFile {
 		// the new entry.  getParentWithEmtpySlots() will be useful here.  Don't forget to update
 		// the sibling pointers of all the affected leaf pages.  Return the page into which a 
 		// tuple with the given key field should be inserted.
-        return null;
+
+		// 1. remove last haft entries to new Page
+		int half = page.getNumTuples() / 2;
+		BTreeLeafPage emptyPage = (BTreeLeafPage) getEmptyPage(tid, dirtypages, BTreePageId.LEAF);
+		Iterator<Tuple> reversedIt = page.reverseIterator();
+		while (reversedIt.hasNext() && half > 0) {
+			Tuple next = reversedIt.next();
+			emptyPage.insertTuple(next);
+			page.deleteTuple(next);
+			half--;
+		}
+		// 2. copy mid entry to parent node
+		Tuple up = reversedIt.next();
+		BTreeInternalPage parentWithEmptySlots = getParentWithEmptySlots(tid, dirtypages, page.getParentId(), field);
+		BTreeEntry bTreeEntry = new BTreeEntry(up.getField(page.keyField), page.getId(), emptyPage.getId());
+		parentWithEmptySlots.insertEntry(bTreeEntry);
+
+
+		// 3. Set Node sibling relation
+		if (page.getRightSiblingId() != null) {
+			BTreeLeafPage right = (BTreeLeafPage) getPage(tid, dirtypages, page.getRightSiblingId(), Permissions.READ_WRITE);
+			right.setLeftSiblingId(emptyPage.getId());
+			dirtypages.put(right.getId(), right);
+		}
+		emptyPage.setLeftSiblingId(page.getId());
+		emptyPage.setRightSiblingId(page.getRightSiblingId());
+		page.setRightSiblingId(emptyPage.getId());
+
+		// 4. add dirty page
+		dirtypages.put(parentWithEmptySlots.getId(),parentWithEmptySlots);
+		dirtypages.put(page.getId(),page);
+		dirtypages.put(emptyPage.getId(),emptyPage);
+
+		return field.compare(Op.GREATER_THAN_OR_EQ, up.getField(page.keyField)) ? emptyPage : page;
 		
 	}
 	
@@ -277,6 +328,36 @@ public class BTreeFile implements DbFile {
 		// the parent pointers of all the children moving to the new page.  updateParentPointers()
 		// will be useful here.  Return the page into which an entry with the given key field
 		// should be inserted.
+		// 1. put last half entries into newPage
+		int half = page.getNumEntries() / 2;
+		Iterator<BTreeEntry> reverseIt = page.reverseIterator();
+		BTreeInternalPage newPage = (BTreeInternalPage) getEmptyPage(tid, dirtypages, BTreePageId.INTERNAL);
+		while (reverseIt.hasNext()) {
+			BTreeEntry next = reverseIt.next();
+			page.deleteKeyAndRightChild(next);
+			newPage.insertEntry(next);
+			half--;
+		}
+
+		// 2. push mid entry up to parent node
+		BTreeEntry up = reverseIt.next();
+		BTreeInternalPage parent = getParentWithEmptySlots(tid, dirtypages, page.getParentId(), field);
+		page.deleteKeyAndRightChild(up);
+		parent.insertEntry(up);
+		up.setLeftChild(page.getId());
+		up.setRightChild(newPage.getId());
+		parent.insertEntry(up);
+		page.setParentId(parent.getId());
+		newPage.setParentId(parent.getId());
+
+		// 3. set newPage's  child nodes' parent pointer
+		// 因为
+		updateParentPointers();
+
+		// 4. add dirty pages
+
+
+
 		return null;
 	}
 	
@@ -304,16 +385,22 @@ public class BTreeFile implements DbFile {
 		
 		// create a parent node if necessary
 		// this will be the new root of the tree
+		// 这个代表调用getParent的节点为根节点， 所以要重新创建一个新的根节点
 		if(parentId.pgcateg() == BTreePageId.ROOT_PTR) {
+			// 创新新的根节点
 			parent = (BTreeInternalPage) getEmptyPage(tid, dirtypages, BTreePageId.INTERNAL);
 
 			// update the root pointer
+			// 拿到原来的根节点指针
 			BTreeRootPtrPage rootPtr = (BTreeRootPtrPage) getPage(tid, dirtypages,
 					BTreeRootPtrPage.getId(tableid), Permissions.READ_WRITE);
+			// 拿到原来根节点的id
 			BTreePageId prevRootId = rootPtr.getRootId(); //save prev id before overwriting.
+			// 替换成新的根节点
 			rootPtr.setRootId(parent.getId());
 
 			// update the previous root to now point to this new root.
+			// 原来根节点指向新的根节点
 			BTreePage prevRootPage = (BTreePage)getPage(tid, dirtypages, prevRootId, Permissions.READ_WRITE);
 			prevRootPage.setParentId(parent.getId());
 		}

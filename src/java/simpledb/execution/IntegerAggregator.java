@@ -1,7 +1,11 @@
 package simpledb.execution;
 
 import simpledb.common.Type;
+import simpledb.storage.Field;
+import simpledb.storage.IntField;
 import simpledb.storage.Tuple;
+
+import java.util.HashMap;
 
 /**
  * Knows how to compute some aggregate over a set of IntFields.
@@ -9,6 +13,8 @@ import simpledb.storage.Tuple;
 public class IntegerAggregator implements Aggregator {
 
     private static final long serialVersionUID = 1L;
+
+    HashMap<Field, Tuple> map;
 
     /**
      * Aggregate constructor
@@ -24,9 +30,19 @@ public class IntegerAggregator implements Aggregator {
      * @param what
      *            the aggregation operator
      */
+    int gbfield;
+
+    Type gbfieldtype;
+
+    int afield;
+
+    Op op;
 
     public IntegerAggregator(int gbfield, Type gbfieldtype, int afield, Op what) {
-        // some code goes here
+        this.afield = afield;
+        this.gbfield = gbfield;
+        this.op = what;
+        this.afield = afield;
     }
 
     /**
@@ -37,7 +53,17 @@ public class IntegerAggregator implements Aggregator {
      *            the Tuple containing an aggregate field and a group-by field
      */
     public void mergeTupleIntoGroup(Tuple tup) {
-        // some code goes here
+        if (map.containsKey(tup.getField(gbfield))) {
+            Tuple tupleInMap = map.get(tup.getField(gbfield));
+            int value = ((IntField) tup.getField(afield)).getValue();
+        } else {
+
+        }
+
+    }
+
+    private void operate(Op op, Tuple tup1, Tuple tup2) {
+
     }
 
     /**

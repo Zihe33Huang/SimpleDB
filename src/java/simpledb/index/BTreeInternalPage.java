@@ -121,9 +121,16 @@ public class BTreeInternalPage extends BTreePage {
  	 */
 	public int getMaxEntries() {        
 		int keySize = td.getFieldType(keyField).getLen();
+		// keySize就是Entry的值， Index_SIZE就是一个指针, 额外1 bit是header里存这个entry的bit.
+		// PS: 为什么不是两个指针, 一个entry不是有两个指针吗？  因为InternalPage的底层是Field数组和Int数组, 而不是entry
+		// 相邻的entry其实是冗余了一个指针的，那就浪费空间，所以用数组当底层。  因此近乎于一个entry 一个指针， 然后在下面的extraBits中
+		// 再加一个指针
 		int bitsPerEntryIncludingHeader = keySize * 8 + INDEX_SIZE * 8 + 1;
-		// extraBits are: one parent pointer, 1 byte for child page category, 
+		// extraBits are: one parent pointer, 1 byte for child page category,
 		// one extra child pointer (node with m entries has m+1 pointers to children), 1 bit for extra header
+		// Q1: BTreePage中不是还有BTreePageId pid; TupleDesc td;吗，为什么不考虑？ 因为这里考虑的是在disk中的空间大小，而这两个
+		// 字段是不会落盘的。
+		// Q2: 为什么还要在 + 1,  现在不知道，后面再想
 		int extraBits = 2 * INDEX_SIZE * 8 + 8 + 1;
         return (BufferPool.getPageSize()*8 - extraBits) / bitsPerEntryIncludingHeader;
 	}

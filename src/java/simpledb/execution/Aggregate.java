@@ -5,6 +5,8 @@ import simpledb.storage.Tuple;
 import simpledb.storage.TupleDesc;
 import simpledb.transaction.TransactionAbortedException;
 
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 
@@ -16,6 +18,14 @@ import java.util.NoSuchElementException;
 public class Aggregate extends Operator {
 
     private static final long serialVersionUID = 1L;
+
+    OpIterator it;
+
+    int afield;
+
+    int gfield;
+
+    Aggregator.Op op;
 
     /**
      * Constructor.
@@ -31,7 +41,10 @@ public class Aggregate extends Operator {
      * @param aop    The aggregation operator to use
      */
     public Aggregate(OpIterator child, int afield, int gfield, Aggregator.Op aop) {
-        // some code goes here
+        this.it = child;
+        this.afield = afield;
+        this.gfield = gfield;
+        this.op = aop;
     }
 
     /**
@@ -40,8 +53,7 @@ public class Aggregate extends Operator {
      * {@link Aggregator#NO_GROUPING}
      */
     public int groupField() {
-        // some code goes here
-        return -1;
+        return gfield;
     }
 
     /**
@@ -50,16 +62,14 @@ public class Aggregate extends Operator {
      * null;
      */
     public String groupFieldName() {
-        // some code goes here
-        return null;
+        return this.getTupleDesc().tdItems.get(gfield).fieldName;
     }
 
     /**
      * @return the aggregate field
      */
     public int aggregateField() {
-        // some code goes here
-        return -1;
+        return afield;
     }
 
     /**
@@ -67,8 +77,7 @@ public class Aggregate extends Operator {
      * tuples
      */
     public String aggregateFieldName() {
-        // some code goes here
-        return null;
+        return this.getTupleDesc().tdItems.get(afield).fieldName;
     }
 
     /**
@@ -85,7 +94,8 @@ public class Aggregate extends Operator {
 
     public void open() throws NoSuchElementException, DbException,
             TransactionAbortedException {
-        // some code goes here
+        it.open();
+        super.open();
     }
 
     /**
@@ -116,8 +126,7 @@ public class Aggregate extends Operator {
      * iterator.
      */
     public TupleDesc getTupleDesc() {
-        // some code goes here
-        return null;
+        return this.it.getTupleDesc();
     }
 
     public void close() {

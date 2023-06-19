@@ -165,14 +165,29 @@ public class IntHistogramTest {
 	 */
 	@Test public void opNotEqualsTest() {
 		IntHistogram h = new IntHistogram(10, 1, 10);
-		
 		// Set some values
 		h.addValue(3);
 		h.addValue(3);
 		h.addValue(3);
-		
 		// Be conservative in case of alternate implementations
 		Assert.assertTrue(h.estimateSelectivity(Op.NOT_EQUALS, 3) < 0.001);
 		Assert.assertTrue(h.estimateSelectivity(Op.NOT_EQUALS, 8) > 0.01);
 	}
+
+	@Test
+	public void test() {
+		int a = 16, b = 9;
+		System.out.println(gcd(a, b));
+	}
+
+	private int gcd(int a, int b) {
+		if (a < b) {
+			int tmp = a;
+			a = b;
+			b = tmp;
+		}
+		int r = a % b;
+		return r == 0 ? b : gcd(b, r);
+	}
+
 }

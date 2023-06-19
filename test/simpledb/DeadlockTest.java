@@ -83,6 +83,9 @@ public class DeadlockTest extends TestUtil.CreateHeapFile {
   @Test public void testReadWriteDeadlock() throws Exception {
     System.out.println("testReadWriteDeadlock constructing deadlock:");
 
+    /**
+     * Zihe： t1有p0的读锁,  t2有p1的读锁,    t1去拿p1的写锁,  t2去拿p0的写锁, 那这两个肯定都拿不到, 所以等待
+     */
     LockGrabber lg1Read = startGrabber(tid1, p0, Permissions.READ_ONLY);
     LockGrabber lg2Read = startGrabber(tid2, p1, Permissions.READ_ONLY);
 
@@ -101,7 +104,7 @@ public class DeadlockTest extends TestUtil.CreateHeapFile {
 
       if (lg1Write.getError() != null) {
         lg1Read.stop(); lg1Write.stop();
-        bp.transactionComplete(tid1);
+        bp.transactionComplete(tid1); // 此时t1的读锁释放掉了, 肯定被t2加上了写锁
         Thread.sleep(rand.nextInt(WAIT_INTERVAL));
 
         tid1 = new TransactionId();

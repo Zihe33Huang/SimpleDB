@@ -46,6 +46,7 @@ public class TransactionTest extends SimpleDbTestBase {
             list[i].start();
         }
 
+        // zihe: 这里就是设置一个时间点，超过这个时间点则停下
         long stopTestTime = System.currentTimeMillis() + TIMEOUT_MILLIS;
         for (XactionTester tester : list) {
             long timeout = stopTestTime - System.currentTimeMillis();

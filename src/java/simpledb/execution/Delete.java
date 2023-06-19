@@ -7,6 +7,7 @@ import simpledb.storage.BufferPool;
 import simpledb.storage.IntField;
 import simpledb.storage.Tuple;
 import simpledb.storage.TupleDesc;
+import simpledb.transaction.Transaction;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
@@ -20,6 +21,16 @@ public class Delete extends Operator {
 
     private static final long serialVersionUID = 1L;
 
+
+    TupleDesc tupleDesc;
+
+    TransactionId t;
+
+    OpIterator child;
+
+    boolean hasDeleted;
+
+
     /**
      * Constructor specifying the transaction that this delete belongs to as
      * well as the child to read from.
@@ -30,24 +41,28 @@ public class Delete extends Operator {
      *            The child operator from which to read tuples for deletion
      */
     public Delete(TransactionId t, OpIterator child) {
-        // some code goes here
+        this.t = t;
+        this.child = child;
+        Type[] types = {Type.INT_TYPE};
+        this.tupleDesc = new TupleDesc(types);
+        this.hasDeleted = false;
     }
 
     public TupleDesc getTupleDesc() {
-        // some code goes here
-        return null;
+        return this.tupleDesc;
     }
 
     public void open() throws DbException, TransactionAbortedException {
-        // some code goes here
+        super.open();
+        this.child.open();
     }
 
     public void close() {
-        // some code goes here
+        this.child.close();
     }
 
     public void rewind() throws DbException, TransactionAbortedException {
-        // some code goes here
+        this.child.rewind();
     }
 
     /**
@@ -60,8 +75,23 @@ public class Delete extends Operator {
      * @see BufferPool#deleteTuple
      */
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
-        // some code goes here
-        return null;
+        if (this.hasDeleted) {
+            return null;
+        }
+        int cnt = 0;
+        hasDeleted = true;
+        while (this.child.hasNext()) {
+            Tuple next = this.child.next();
+            try {
+                Database.getBufferPool().deleteTuple(t, next);
+                cnt++;
+            } catch (IOException ioException) {
+                ioException.printStackTrace();
+            }
+        }
+        Tuple tuple = new Tuple(this.tupleDesc);
+        tuple.setField(0, new IntField(cnt));
+        return tuple;
     }
 
     @Override
